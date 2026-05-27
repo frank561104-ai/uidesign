@@ -273,8 +273,10 @@ export default function App() {
     try {
       const response = await fetch(`${API_BASE}/api/audits`, { method: "POST", body: formData });
       if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.detail || "走查任务创建失败");
+        const text = await response.text().catch(() => "");
+        let detail = text;
+        try { detail = JSON.parse(text).detail || text; } catch { /* raw text */ }
+        throw new Error(`[${response.status}] ${detail || "走查任务创建失败"}`);
       }
       const result = (await response.json()) as Audit;
       setAudit(result);

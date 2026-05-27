@@ -571,6 +571,8 @@ def _report_for_audit(audit: AuditResult) -> str:
 
 @app.post("/api/audits", response_model=AuditResult)
 async def create_audit(design_image: UploadFile = File(...), developed_image: UploadFile = File(...)):
+    import traceback
+
     design_content = await _read_image(design_image)
     developed_content = await _read_image(developed_image)
     design = _decode_image(design_content)
@@ -586,9 +588,13 @@ async def create_audit(design_image: UploadFile = File(...), developed_image: Up
         except Exception as exc:
             capabilities.ocrEnabled = False
             capabilities.notes.append(f"OCR 执行失败，已跳过文字差异检测：{exc}")
+            capabilities.notes.append(traceback.format_exc()[-300:])
     if capabilities.gptEnabled:
-        issues, ai_note = _enhance_issues_with_ai(issues, capabilities)
-        capabilities.notes.append(ai_note)
+        try:
+            issues, ai_note = _enhance_issues_with_ai(issues, capabilities)
+            capabilities.notes.append(ai_note)
+        except Exception as exc:
+            capabilities.notes.append(f"AI 增强失败：{exc}")
     audit_id = uuid4().hex
     audit = AuditResult(
         id=audit_id,
