@@ -7,6 +7,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="error-fallback" style="padding:20px;color:#b22626;font-family:sans-serif;font-size:14px;line-height:1.6;word-break:break-all;background:#fff;"></div>
+    <script>
+      var errors = [];
+      window.onerror = function(msg, src, line, col, err) {
+        errors.push(msg + ' at line ' + line);
+        var el = document.getElementById('error-fallback');
+        if (el) { el.textContent = 'JS Error: ' + errors.join(' | '); }
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
