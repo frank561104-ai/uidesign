@@ -111,6 +111,24 @@ AUDITS: Dict[str, AuditResult] = {}
 OCR_ENGINE = None
 
 
+@app.on_event("startup")
+def _warmup_ocr():
+    """Preload Tesseract OCR models so the first user request isn't penalised."""
+    if os.getenv("UIDESIGN_ENABLE_OCR") != "true":
+        return
+    try:
+        import pytesseract
+        from PIL import Image
+
+        tesseract_path = os.getenv("TESSERACT_CMD") or "tesseract"
+        pytesseract.pytesseract.tesseract_cmd = tesseract_path
+        # Run a tiny OCR pass to load language models into memory
+        dummy = Image.new("RGB", (40, 20), color=(255, 255, 255))
+        pytesseract.image_to_data(dummy, output_type=pytesseract.Output.DICT, lang="chi_sim+eng")
+    except Exception:
+        pass
+
+
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
