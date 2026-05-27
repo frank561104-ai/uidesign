@@ -3,14 +3,14 @@ services:
     name: uidesign-api
     env: python
     plan: free
-    buildCommand: python3 -m pip install --only-binary :all: -r backend/requirements.txt
+    buildCommand: apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng && python3 -m pip install --only-binary :all: -r backend/requirements.txt
     startCommand: python3 -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
       - key: UIDESIGN_CORS_ORIGINS
         value: https://uidesign-delta.vercel.app,https://uidesign-frank561104-7610s-projects.vercel.app
       - key: UIDESIGN_ENABLE_OCR
-        value: "false"
+        value: "true"
       - key: UIDESIGN_ENABLE_GPT
         value: "false"
       - key: OPENAI_MODEL
