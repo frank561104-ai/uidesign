@@ -336,81 +336,96 @@ def _detect_text_issues(design: np.ndarray, developed: np.ndarray, start_index: 
     def _fuzzy_ratio(a: str, b: str) -> float:
         return SequenceMatcher(None, a, b).ratio()
 
-    # Try to match each design text item to a developed item
+    def _center_dist(a: BBox, b: BBox) -> float:
+        """Mahattan distance between box centers."""
+        ax = a.x + a.width / 2
+        ay = a.y + a.height / 2
+        bx = b.x + b.width / 2
+        by = b.y + b.height / 2
+        return abs(ax - bx) + abs(ay - by)
+
+    # Position-first matching: for each design item, find the closest developed item by position
     matched_dev_indices: set = set()
     for d_item in design_items:
-        d_norm = d_item["normalized"]
-        best_score = 0.0
+        d_box = d_item["bbox"]
+        best_dist = float("inf")
         best_dev_idx = -1
         for idx, dev_item in enumerate(developed_items):
             if idx in matched_dev_indices:
                 continue
-            score = _fuzzy_ratio(d_norm, dev_item["normalized"])
-            if score > best_score:
-                best_score = score
+            dist = _center_dist(d_box, dev_item["bbox"])
+            if dist < best_dist:
+                best_dist = dist
                 best_dev_idx = idx
 
-        # Only report as "missing" if no reasonable match found
-        if best_score < 0.6 and len(d_norm) >= 2:
-            box = d_item["bbox"]
-            issues.append(
-                Issue(
-                    id=f"TXT-{start_index + len(issues):03d}",
-                    type="文本问题",
-                    severity="中" if best_score < 0.3 else "低",
-                    bbox=box,
-                    description=f"开发页面疑似缺少文本“{d_item['text']}”。",
-                    designObservation=f"设计稿包含文本“{d_item['text']}”。",
-                    developedObservation=f"开发页面最近似匹配得分 {best_score:.2f}，未确认到同一文本。",
-                    suggestion="检查文案是否漏开发、被遮挡，或截图状态是否一致。",
-                    confidence=round(d_item["confidence"] * (1 - best_score), 2),
-                )
-            )
-        elif best_dev_idx >= 0:
-            matched_dev_indices.add(best_dev_idx)
-            # Check position offset (threshold proportional to text height)
-            dev_item = developed_items[best_dev_idx]
-            d_box = d_item["bbox"]
-            dev_box = dev_item["bbox"]
-            offset = abs(d_box.x - dev_box.x) + abs(d_box.y - dev_box.y)
-            font_hint = max(d_box.height, dev_box.height, 12)
-            offset_threshold = max(40, font_hint * 2.5)
-            if offset > offset_threshold:
+        # Max spatial distance: 2x the larger text height (same-line tolerance) or 80px
+        font_h = max(d_box.height, 14)
+        max_dist = max(font_h * 3, 60)
+
+        if best_dev_idx < 0 or best_dist > max_dist:
+            # No position match — truly missing
+            if len(d_item["normalized"]) >= 3:
                 issues.append(
                     Issue(
                         id=f"TXT-{start_index + len(issues):03d}",
                         type="文本问题",
-                        severity="低",
-                        bbox=dev_box,
-                        description=f"文本“{dev_item['text']}”位置疑似偏移。",
-                        designObservation=f"设计稿文本位置约为 x={d_box.x}, y={d_box.y}。",
-                        developedObservation=f"开发页面文本位置约为 x={dev_box.x}, y={dev_box.y}（偏移 {offset}px）。",
-                        suggestion="检查文字所在组件的间距、对齐和换行设置。",
-                        confidence=round(min(d_item["confidence"], dev_item["confidence"]) * min(1.0, offset / 100), 2),
+                        severity="中",
+                        bbox=d_box,
+                        description=f"开发页面疑似缺少文本“{d_item['text']}”。",
+                        designObservation=f"设计稿包含文本“{d_item['text']}”（附近未找到对应的开发文本）。",
+                        developedObservation="开发页面该位置附近无文本匹配。",
+                        suggestion="检查文案是否漏开发、被遮挡，或截图状态是否一致。",
+                        confidence=round(d_item["confidence"], 2),
                     )
                 )
-
-    # Report developed items that have no match in design (extra elements)
-    for idx, dev_item in enumerate(developed_items):
-        if idx in matched_dev_indices:
             continue
-        d_norm_list = [d["normalized"] for d in design_items]
-        best_score = max((_fuzzy_ratio(dev_item["normalized"], dn) for dn in d_norm_list), default=0)
-        if best_score < 0.6 and len(dev_item["normalized"]) >= 2:
-            box = dev_item["bbox"]
+
+        matched_dev_indices.add(best_dev_idx)
+        dev_item = developed_items[best_dev_idx]
+        dev_box = dev_item["bbox"]
+        text_similarity = _fuzzy_ratio(d_item["normalized"], dev_item["normalized"])
+
+        # Only report text mismatch if content really differs (not just OCR noise)
+        if text_similarity < 0.55 and len(d_item["normalized"]) >= 3 and len(dev_item["normalized"]) >= 3:
             issues.append(
                 Issue(
                     id=f"TXT-{start_index + len(issues):03d}",
-                    type="多余元素",
+                    type="文本问题",
                     severity="低",
-                    bbox=box,
-                    description=f"开发页面疑似多出文本“{dev_item['text']}”。",
-                    designObservation="设计稿 OCR 结果中未找到对应文本。",
-                    developedObservation=f"开发页面包含文本“{dev_item['text']}”。",
-                    suggestion="检查是否多开发了文案，或确认设计稿与开发页面是否为同一状态。",
-                    confidence=round(dev_item["confidence"] * (1 - best_score), 2),
+                    bbox=dev_box,
+                    description=f"同位置文本内容不一致：设计稿“{d_item['text']}” vs 开发“{dev_item['text']}”。",
+                    designObservation=f"设计稿此位置文本为“{d_item['text']}”。",
+                    developedObservation=f"开发页面同位置文本为“{dev_item['text']}”。",
+                    suggestion="检查文案内容是否写错或 OCR 识别偏差。",
+                    confidence=round(1 - text_similarity, 2),
                 )
             )
+
+    # Report developed items with no spatial match in design (extra elements)
+    for idx, dev_item in enumerate(developed_items):
+        if idx in matched_dev_indices:
+            continue
+        dev_box = dev_item["bbox"]
+        # Check if any design item is spatially close
+        too_close = any(
+            _center_dist(dev_box, d["bbox"]) < max(d["bbox"].height * 3, 60)
+            for d in design_items
+        )
+        if too_close or len(dev_item["normalized"]) < 3:
+            continue
+        issues.append(
+            Issue(
+                id=f"TXT-{start_index + len(issues):03d}",
+                type="多余元素",
+                severity="低",
+                bbox=dev_box,
+                description=f"开发页面疑似多出文本“{dev_item['text']}”。",
+                designObservation="设计稿该位置附近未找到对应文本。",
+                developedObservation=f"开发页面包含文本“{dev_item['text']}”。",
+                suggestion="检查是否多开发了文案，或确认设计稿与开发页面是否为同一状态。",
+                confidence=round(dev_item["confidence"], 2),
+            )
+        )
 
     return issues, f"OCR 已识别设计稿 {len(design_items)} 处文本、开发页面 {len(developed_items)} 处文本。"
 
