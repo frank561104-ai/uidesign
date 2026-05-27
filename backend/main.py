@@ -296,11 +296,18 @@ def _ocr_items(image: np.ndarray) -> List[dict]:
     num_boxes = len(data["text"])
     for i in range(num_boxes):
         text = data["text"][i].strip()
-        if not text:
+        
+        # 过滤空文本和极短文本（单字符或两个字符的文本容易误识别）
+        if not text or len(text) <= 2:
             continue
         
+        # 提高置信度阈值，过滤低置信度结果
         confidence = float(data["conf"][i])
-        if confidence < 0.1:
+        if confidence < 0.5:
+            continue
+            
+        # 过滤纯数字或特殊符号（可能是误识别的噪声）
+        if re.match(r"^[\d\s\-_+=\/*<>~`!@#$%^&()[\]{}|\\;:,.?]*$", text):
             continue
             
         x = data["left"][i]
@@ -320,65 +327,88 @@ def _ocr_items(image: np.ndarray) -> List[dict]:
 
 
 def _detect_text_issues(design: np.ndarray, developed: np.ndarray, start_index: int) -> tuple:
+    from difflib import SequenceMatcher
+
     design_items = _ocr_items(design)
     developed_items = _ocr_items(developed)
-    design_by_text = {item["normalized"]: item for item in design_items}
-    developed_by_text = {item["normalized"]: item for item in developed_items}
     issues: List[Issue] = []
 
-    for normalized, item in design_by_text.items():
-        if normalized not in developed_by_text:
-            box = item["bbox"]
+    def _fuzzy_ratio(a: str, b: str) -> float:
+        return SequenceMatcher(None, a, b).ratio()
+
+    # Try to match each design text item to a developed item
+    matched_dev_indices: set = set()
+    for d_item in design_items:
+        d_norm = d_item["normalized"]
+        best_score = 0.0
+        best_dev_idx = -1
+        for idx, dev_item in enumerate(developed_items):
+            if idx in matched_dev_indices:
+                continue
+            score = _fuzzy_ratio(d_norm, dev_item["normalized"])
+            if score > best_score:
+                best_score = score
+                best_dev_idx = idx
+
+        # Only report as "missing" if no reasonable match found
+        if best_score < 0.6 and len(d_norm) >= 2:
+            box = d_item["bbox"]
             issues.append(
                 Issue(
                     id=f"TXT-{start_index + len(issues):03d}",
                     type="文本问题",
-                    severity="中",
+                    severity="中" if best_score < 0.3 else "低",
                     bbox=box,
-                    description=f"开发页面疑似缺少文本“{item['text']}”。",
-                    designObservation=f"设计稿包含文本“{item['text']}”。",
-                    developedObservation="开发页面 OCR 结果中未找到对应文本。",
+                    description=f"开发页面疑似缺少文本“{d_item['text']}”。",
+                    designObservation=f"设计稿包含文本“{d_item['text']}”。",
+                    developedObservation=f"开发页面最近似匹配得分 {best_score:.2f}，未确认到同一文本。",
                     suggestion="检查文案是否漏开发、被遮挡，或截图状态是否一致。",
-                    confidence=round(item["confidence"], 2),
+                    confidence=round(d_item["confidence"] * (1 - best_score), 2),
                 )
             )
+        elif best_dev_idx >= 0:
+            matched_dev_indices.add(best_dev_idx)
+            # Check position offset (threshold proportional to text height)
+            dev_item = developed_items[best_dev_idx]
+            d_box = d_item["bbox"]
+            dev_box = dev_item["bbox"]
+            offset = abs(d_box.x - dev_box.x) + abs(d_box.y - dev_box.y)
+            font_hint = max(d_box.height, dev_box.height, 12)
+            offset_threshold = max(40, font_hint * 2.5)
+            if offset > offset_threshold:
+                issues.append(
+                    Issue(
+                        id=f"TXT-{start_index + len(issues):03d}",
+                        type="文本问题",
+                        severity="低",
+                        bbox=dev_box,
+                        description=f"文本“{dev_item['text']}”位置疑似偏移。",
+                        designObservation=f"设计稿文本位置约为 x={d_box.x}, y={d_box.y}。",
+                        developedObservation=f"开发页面文本位置约为 x={dev_box.x}, y={dev_box.y}（偏移 {offset}px）。",
+                        suggestion="检查文字所在组件的间距、对齐和换行设置。",
+                        confidence=round(min(d_item["confidence"], dev_item["confidence"]) * min(1.0, offset / 100), 2),
+                    )
+                )
 
-    for normalized, item in developed_by_text.items():
-        if normalized not in design_by_text:
-            box = item["bbox"]
+    # Report developed items that have no match in design (extra elements)
+    for idx, dev_item in enumerate(developed_items):
+        if idx in matched_dev_indices:
+            continue
+        d_norm_list = [d["normalized"] for d in design_items]
+        best_score = max((_fuzzy_ratio(dev_item["normalized"], dn) for dn in d_norm_list), default=0)
+        if best_score < 0.6 and len(dev_item["normalized"]) >= 2:
+            box = dev_item["bbox"]
             issues.append(
                 Issue(
                     id=f"TXT-{start_index + len(issues):03d}",
                     type="多余元素",
                     severity="低",
                     bbox=box,
-                    description=f"开发页面疑似多出文本“{item['text']}”。",
+                    description=f"开发页面疑似多出文本“{dev_item['text']}”。",
                     designObservation="设计稿 OCR 结果中未找到对应文本。",
-                    developedObservation=f"开发页面包含文本“{item['text']}”。",
+                    developedObservation=f"开发页面包含文本“{dev_item['text']}”。",
                     suggestion="检查是否多开发了文案，或确认设计稿与开发页面是否为同一状态。",
-                    confidence=round(item["confidence"], 2),
-                )
-            )
-
-    for normalized, design_item in design_by_text.items():
-        developed_item = developed_by_text.get(normalized)
-        if not developed_item:
-            continue
-        design_box = design_item["bbox"]
-        developed_box = developed_item["bbox"]
-        offset = abs(design_box.x - developed_box.x) + abs(design_box.y - developed_box.y)
-        if offset > 24:
-            issues.append(
-                Issue(
-                    id=f"TXT-{start_index + len(issues):03d}",
-                    type="文本问题",
-                    severity="低",
-                    bbox=developed_box,
-                    description=f"文本“{developed_item['text']}”位置疑似偏移。",
-                    designObservation=f"设计稿文本位置约为 x={design_box.x}, y={design_box.y}。",
-                    developedObservation=f"开发页面文本位置约为 x={developed_box.x}, y={developed_box.y}。",
-                    suggestion="检查文字所在组件的间距、对齐和换行设置。",
-                    confidence=round(min(design_item["confidence"], developed_item["confidence"]), 2),
+                    confidence=round(dev_item["confidence"] * (1 - best_score), 2),
                 )
             )
 
