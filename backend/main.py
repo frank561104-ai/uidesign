@@ -299,7 +299,7 @@ def _ocr_items(image: np.ndarray) -> List[dict]:
         if not text:
             continue
         
-        confidence = float(data["confidence"][i])
+        confidence = float(data["conf"][i])
         if confidence < 0.1:
             continue
             
