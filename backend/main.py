@@ -117,13 +117,14 @@ def _capabilities() -> Capabilities:
 
     if os.getenv("UIDESIGN_ENABLE_OCR") == "true":
         try:
-            import paddleocr  # noqa: F401
+            import pytesseract  # noqa: F401
+            from PIL import Image  # noqa: F401
 
             ocr_enabled = True
         except Exception:
-            notes.append("PaddleOCR 未安装或不可用，已跳过文字识别。")
+            notes.append("pytesseract 未安装或不可用，已跳过文字识别。")
     else:
-        notes.append("OCR 未启用：设置 UIDESIGN_ENABLE_OCR=true 并安装 PaddleOCR 后可使用。")
+        notes.append("OCR 未启用：设置 UIDESIGN_ENABLE_OCR=true 并安装 pytesseract 后可使用。")
 
     wants_ai = os.getenv("UIDESIGN_ENABLE_AI") == "true" or os.getenv("UIDESIGN_ENABLE_GPT") == "true"
     api_key = _api_key_for_provider(ai_provider)
@@ -277,31 +278,38 @@ def _normalize_text(text: str) -> str:
 
 
 def _ocr_items(image: np.ndarray) -> List[dict]:
-    global OCR_ENGINE
-    if OCR_ENGINE is None:
-        from paddleocr import PaddleOCR
+    import pytesseract
+    from PIL import Image
 
-        OCR_ENGINE = PaddleOCR(use_angle_cls=True, lang="ch")
-
-    raw_result = OCR_ENGINE.ocr(image)
-    rows = raw_result[0] if raw_result and isinstance(raw_result[0], list) else []
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(image_rgb)
+    data = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT, lang="chi_sim+eng")
+    
     items = []
-    for row in rows:
-        if len(row) < 2:
+    num_boxes = len(data["text"])
+    for i in range(num_boxes):
+        text = data["text"][i].strip()
+        if not text:
             continue
-        box, payload = row[0], row[1]
-        text, confidence = payload[0], float(payload[1])
-        xs = [int(point[0]) for point in box]
-        ys = [int(point[1]) for point in box]
+        
+        confidence = float(data["confidence"][i])
+        if confidence < 0.1:
+            continue
+            
+        x = data["left"][i]
+        y = data["top"][i]
+        width = data["width"][i]
+        height = data["height"][i]
+        
         items.append(
             {
                 "text": text,
                 "normalized": _normalize_text(text),
                 "confidence": confidence,
-                "bbox": BBox(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys)),
+                "bbox": BBox(x=x, y=y, width=width, height=height),
             }
         )
-    return [item for item in items if item["normalized"]]
+    return items
 
 
 def _detect_text_issues(design: np.ndarray, developed: np.ndarray, start_index: int) -> tuple:

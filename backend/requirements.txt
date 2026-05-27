@@ -8,4 +8,5 @@ pydantic==2.10.5
 pytest==8.3.4
 python-dotenv==1.2.1
 python-multipart==0.0.20
+pytesseract==0.3.13
 uvicorn[standard]==0.34.0
