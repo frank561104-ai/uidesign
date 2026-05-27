@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: uidesign-api
+    env: python
+    plan: free
+    buildCommand: python3 -m pip install -r backend/requirements.txt
+    startCommand: python3 -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: UIDESIGN_CORS_ORIGINS
+        value: https://your-frontend-domain.vercel.app
+      - key: UIDESIGN_ENABLE_OCR
+        value: "false"
+      - key: UIDESIGN_ENABLE_GPT
+        value: "false"
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: OPENAI_API_KEY
+        sync: false
