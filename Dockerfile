@@ -15,5 +15,8 @@ COPY backend/ backend/
 COPY frontend/dist/ frontend/dist/
 
 ENV UIDESIGN_ENABLE_OCR=true
+ENV UIDESIGN_ENABLE_GPT=true
+ENV AI_PROVIDER=deepseek
+ENV AI_MODEL=deepseek-chat
 
 CMD python3 -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
