@@ -190,6 +190,7 @@ def _capabilities() -> Capabilities:
             "AI_API_KEY_set": "yes" if os.getenv("AI_API_KEY") else "no",
             "wants_ai": str(wants_ai),
             "provider": ai_provider,
+            "_all_relevant_env": {k: v for k, v in sorted(os.environ.items()) if any(p in k.upper() for p in ("UIDESIGN", "AI_", "DEEPSEEK", "OPENAI", "TESSERACT"))},
         },
     )
 
