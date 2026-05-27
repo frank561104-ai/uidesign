@@ -13,7 +13,7 @@ import { ChangeEvent, useMemo, useState } from "react";
 
 import { Audit, Issue, ReviewStatus, createDemoAudit, createDemoMarkdown } from "./demoAudit";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 const IS_DEMO_MODE = String(import.meta.env.VITE_DEMO_MODE) === "true";
 
 function toPercent(value: number) {
