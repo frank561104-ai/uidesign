@@ -587,6 +587,11 @@ def get_markdown_report(audit_id: str):
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
+@app.get("/")
+async def serve_root():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     file_path = FRONTEND_DIR / full_path
