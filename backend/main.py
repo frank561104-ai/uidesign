@@ -59,6 +59,7 @@ class Capabilities(BaseModel):
     aiProvider: str = "local"
     aiModel: str = "local-rules"
     notes: List[str] = Field(default_factory=list)
+    debug: Dict[str, str] = Field(default_factory=dict)
 
 
 class Score(BaseModel):
@@ -167,10 +168,12 @@ def _capabilities() -> Capabilities:
             import openai  # noqa: F401
 
             ai_enabled = True
-        except Exception:
-            notes.append("OpenAI SDK 未安装，已使用本地规则生成问题描述。")
-    else:
-        notes.append("AI 描述未启用：默认只用本地结构化结果生成描述，不上传原始截图。")
+        except Exception as exc:
+            notes.append(f"OpenAI SDK import 失败：{exc}")
+    elif not wants_ai:
+        notes.append("AI 描述未启用：UIDESIGN_ENABLE_GPT 不是 'true'。")
+    elif not api_key:
+        notes.append(f"AI 描述未启用：{ai_provider.upper()}_API_KEY 环境变量为空或未设置。")
 
     return Capabilities(
         ocrEnabled=ocr_enabled,
@@ -178,6 +181,16 @@ def _capabilities() -> Capabilities:
         aiProvider=ai_provider if ai_enabled else "local",
         aiModel=ai_model if ai_enabled else "local-rules",
         notes=notes,
+        debug={
+            "AI_PROVIDER_env": os.getenv("AI_PROVIDER", "(unset)"),
+            "UIDESIGN_ENABLE_GPT_env": os.getenv("UIDESIGN_ENABLE_GPT", "(unset)"),
+            "UIDESIGN_ENABLE_AI_env": os.getenv("UIDESIGN_ENABLE_AI", "(unset)"),
+            "DEEPSEEK_API_KEY_set": "yes" if os.getenv("DEEPSEEK_API_KEY") else "no",
+            "OPENAI_API_KEY_set": "yes" if os.getenv("OPENAI_API_KEY") else "no",
+            "AI_API_KEY_set": "yes" if os.getenv("AI_API_KEY") else "no",
+            "wants_ai": str(wants_ai),
+            "provider": ai_provider,
+        },
     )
 
 
