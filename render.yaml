@@ -11,7 +11,13 @@ services:
       - key: UIDESIGN_ENABLE_OCR
         value: "true"
       - key: UIDESIGN_ENABLE_GPT
-        value: "false"
+        value: "true"
+      - key: AI_PROVIDER
+        value: deepseek
+      - key: AI_MODEL
+        value: deepseek-chat
+      - key: DEEPSEEK_API_KEY
+        sync: false
       - key: OPENAI_MODEL
         value: gpt-4o
       - key: OPENAI_API_KEY
