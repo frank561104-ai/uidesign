@@ -121,9 +121,15 @@ def _capabilities() -> Capabilities:
             import pytesseract  # noqa: F401
             from PIL import Image  # noqa: F401
 
+            # Verify tesseract binary is reachable
+            tesseract_path = os.getenv("TESSERACT_CMD") or "tesseract"
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+            version = pytesseract.get_tesseract_version()
+            langs = pytesseract.get_languages()
+            notes.append(f"Tesseract {version} 已就绪，可用语言：{', '.join(langs)}")
             ocr_enabled = True
-        except Exception:
-            notes.append("pytesseract 未安装或不可用，已跳过文字识别。")
+        except Exception as exc:
+            notes.append(f"OCR 初始化失败：{exc}")
     else:
         notes.append("OCR 未启用：设置 UIDESIGN_ENABLE_OCR=true 并安装 pytesseract 后可使用。")
 

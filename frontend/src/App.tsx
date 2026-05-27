@@ -112,6 +112,9 @@ function CapabilityNotes({ audit }: { audit: Audit }) {
       {explanations.map((note) => (
         <p key={note}>{note}</p>
       ))}
+      {audit.capabilities.notes?.map((note) => (
+        <p key={note} className="cap-note-detail">{note}</p>
+      ))}
     </section>
   );
 }
