@@ -24,6 +24,8 @@ export type Audit = {
     opencvEnabled: boolean;
     ocrEnabled: boolean;
     gptEnabled: boolean;
+    aiProvider?: string;
+    aiModel?: string;
     notes: string[];
   };
   score: {
@@ -103,9 +105,11 @@ export function createDemoAudit(designFile: File, developedFile: File): Audit {
       opencvEnabled: false,
       ocrEnabled: false,
       gptEnabled: false,
+      aiProvider: "demo",
+      aiModel: "demo-rules",
       notes: [
         "演示模式不会运行真实 OpenCV 检测，只展示前端交互流程。",
-        "演示模式不会启用 OCR 或 GPT-4o，也不会上传完整截图。",
+        "演示模式不会启用 OCR 或 AI 描述模型，也不会上传完整截图。",
       ],
     },
     score: {
@@ -146,7 +150,7 @@ export function createDemoMarkdown(audit: Audit): string {
 ## 能力说明
 
 - 本 demo 不启动 Python 后端。
-- 本 demo 不运行 OpenCV、PaddleOCR 或 GPT-4o。
+- 本 demo 不运行 OpenCV、PaddleOCR 或 AI 描述模型。
 - 上传的截图只在浏览器本地预览，不会被上传。
 
 ## 示例问题

@@ -81,7 +81,7 @@ function CapabilityNotes({ audit }: { audit: Audit }) {
           <span className="status-off">演示模式</span>
           <span className="status-off">OpenCV 未运行</span>
           <span className="status-off">OCR 未启用</span>
-          <span className="status-off">GPT-4o 未启用</span>
+          <span className="status-off">AI 描述未启用</span>
         </div>
         <p>这是单 HTML 前端演示：用于快速展示上传、差异标注、问题列表和报告导出的交互。</p>
         <p>演示模式不会运行真实检测，也不会上传截图；图片只在当前浏览器本地预览。</p>
@@ -94,8 +94,8 @@ function CapabilityNotes({ audit }: { audit: Audit }) {
       ? "OCR 已启用：会检查截图中的文案内容、缺失文本和文本位置。"
       : "OCR 未启用：暂时不会检查截图里的文案是否缺失、写错或位置偏移。",
     audit.capabilities.gptEnabled
-      ? "GPT-4o 已启用：只会基于结构化检测结果优化问题描述，不发送完整截图。"
-      : "GPT-4o 未启用：问题说明由本地规则生成，不会把完整截图发送给外部模型。",
+      ? `AI 描述已启用：${audit.capabilities.aiProvider ?? "模型"} ${audit.capabilities.aiModel ?? ""} 会基于结构化检测结果优化问题描述，不发送完整截图。`
+      : "AI 描述未启用：问题说明由本地规则生成，不会把完整截图发送给外部模型。",
   ];
 
   return (
@@ -106,7 +106,7 @@ function CapabilityNotes({ audit }: { audit: Audit }) {
           OCR {audit.capabilities.ocrEnabled ? "已启用" : "未启用"}
         </span>
         <span className={audit.capabilities.gptEnabled ? "status-on" : "status-off"}>
-          GPT-4o {audit.capabilities.gptEnabled ? "已启用" : "未启用"}
+          AI 描述 {audit.capabilities.gptEnabled ? "已启用" : "未启用"}
         </span>
       </div>
       {explanations.map((note) => (

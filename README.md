@@ -41,13 +41,23 @@ OCR 默认关闭。需要启用时安装 PaddleOCR，并设置：
 UIDESIGN_ENABLE_OCR=true
 ```
 
-GPT-4o 默认关闭，且不会接收完整截图。需要启用时安装 OpenAI Python SDK，并设置：
+AI 描述默认关闭，且不会接收完整截图。需要启用 DeepSeek 时安装 OpenAI Python SDK，并设置：
 
 ```bash
 python3 -m pip install openai
-UIDESIGN_ENABLE_GPT=true
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4o
+UIDESIGN_ENABLE_AI=true
+AI_PROVIDER=deepseek
+AI_MODEL=deepseek-v4-flash
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+```
+
+如果要使用 OpenAI GPT-4o，可以改为：
+
+```bash
+UIDESIGN_ENABLE_AI=true
+AI_PROVIDER=openai
+AI_MODEL=gpt-4o
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 启用后，后端只会把 OpenCV / OCR 产生的结构化问题发送给模型，用来优化问题描述和修复建议，不会发送原始设计稿或页面截图。
@@ -65,7 +75,7 @@ OPENAI_MODEL=gpt-4o
 
 - 第一版不做账号、历史记录、团队空间、URL 自动截图、Figma 文件解析。
 - OpenCV 检测主要能发现明显的颜色、位置、尺寸和结构差异。
-- OCR 和 GPT-4o 是可选能力，未配置时主流程仍可完成。
+- OCR 和 AI 描述模型是可选能力，未配置时主流程仍可完成。
 - 评分是基于问题数量和严重程度的基础规则，不代表最终上线验收结论。
 
 ## 可能误判

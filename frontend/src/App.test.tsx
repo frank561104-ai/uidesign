@@ -14,7 +14,9 @@ const auditPayload = {
     opencvEnabled: true,
     ocrEnabled: false,
     gptEnabled: false,
-    notes: ["GPT-4o 未启用：默认只用本地结构化结果生成描述，不上传原始截图。"],
+    aiProvider: "local",
+    aiModel: "local-rules",
+    notes: ["AI 描述未启用：默认只用本地结构化结果生成描述，不上传原始截图。"],
   },
   score: {
     total: 87,
@@ -97,7 +99,7 @@ describe("App", () => {
     expect(screen.getByText("VIS-001")).toBeInTheDocument();
     expect(screen.getByText("明显的颜色问题，建议按中优先级复核。")).toBeInTheDocument();
     expect(screen.getByText("OCR 未启用：暂时不会检查截图里的文案是否缺失、写错或位置偏移。")).toBeInTheDocument();
-    expect(screen.getByText("GPT-4o 未启用：问题说明由本地规则生成，不会把完整截图发送给外部模型。")).toBeInTheDocument();
+    expect(screen.getByText("AI 描述未启用：问题说明由本地规则生成，不会把完整截图发送给外部模型。")).toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText("问题类型"), "文本问题");
     expect(screen.queryByText("VIS-001")).not.toBeInTheDocument();

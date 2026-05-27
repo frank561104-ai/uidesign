@@ -385,14 +385,17 @@ def _score_for_issues(issues: List[Issue]) -> Score:
     return Score(total=total, dimensions=dimensions, deductions=deductions)
 
 
-def _enhance_issues_with_gpt(issues: List[Issue]) -> tuple:
+def _enhance_issues_with_ai(issues: List[Issue], capabilities: Capabilities) -> tuple:
     if not issues:
-        return issues, "没有检测到问题，未调用 GPT-4o。"
+        return issues, "没有检测到问题，未调用 AI 描述模型。"
     try:
         from openai import OpenAI
 
-        client = OpenAI()
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
+        client = OpenAI(
+            api_key=_api_key_for_provider(capabilities.aiProvider),
+            base_url=_base_url_for_provider(capabilities.aiProvider),
+        )
+        model = capabilities.aiModel
         issue_payload = [
             {
                 "id": issue.id,
@@ -407,15 +410,21 @@ def _enhance_issues_with_gpt(issues: List[Issue]) -> tuple:
             }
             for issue in issues
         ]
-        response = client.responses.create(
+        response = client.chat.completions.create(
             model=model,
-            instructions=(
-                "你是设计还原度走查助手。只根据输入的结构化检测结果生成更清楚的问题描述，"
-                "不要声称你看过原始截图。输出 JSON 数组，每项包含 id、description、suggestion。"
-            ),
-            input=json.dumps(issue_payload, ensure_ascii=False),
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "你是设计还原度走查助手。只根据用户输入的结构化检测结果生成更清楚的问题描述，"
+                        "不要声称你看过原始截图。必须输出 JSON 数组，每项包含 id、description、suggestion。"
+                    ),
+                },
+                {"role": "user", "content": json.dumps(issue_payload, ensure_ascii=False)},
+            ],
         )
-        raw_text = getattr(response, "output_text", "") or ""
+        raw_text = response.choices[0].message.content or ""
         enhanced = json.loads(raw_text)
         enhanced_by_id = {item["id"]: item for item in enhanced if "id" in item}
         for issue in issues:
@@ -424,9 +433,9 @@ def _enhance_issues_with_gpt(issues: List[Issue]) -> tuple:
                 continue
             issue.description = item.get("description") or issue.description
             issue.suggestion = item.get("suggestion") or issue.suggestion
-        return issues, f"GPT-4o 已基于结构化检测结果优化 {len(enhanced_by_id)} 条问题描述。"
+        return issues, f"{capabilities.aiProvider} 已基于结构化检测结果优化 {len(enhanced_by_id)} 条问题描述。"
     except Exception as exc:
-        return issues, f"GPT-4o 调用失败，已保留本地规则描述：{exc}"
+        return issues, f"AI 描述模型调用失败，已保留本地规则描述：{exc}"
 
 
 def _annotate_image(developed: np.ndarray, issues: List[Issue]) -> bytes:
@@ -466,7 +475,9 @@ def _report_for_audit(audit: AuditResult) -> str:
         "",
         f"- OpenCV：{'已启用' if audit.capabilities.opencvEnabled else '未启用'}",
         f"- OCR：{'已启用' if audit.capabilities.ocrEnabled else '未启用'}",
-        f"- GPT-4o：{'已启用' if audit.capabilities.gptEnabled else '未启用'}",
+        f"- AI 描述：{'已启用' if audit.capabilities.gptEnabled else '未启用'}",
+        f"- AI 提供商：{audit.capabilities.aiProvider}",
+        f"- AI 模型：{audit.capabilities.aiModel}",
         "",
         "## 预处理说明",
         "",
@@ -516,8 +527,8 @@ async def create_audit(design_image: UploadFile = File(...), developed_image: Up
             capabilities.ocrEnabled = False
             capabilities.notes.append(f"OCR 执行失败，已跳过文字差异检测：{exc}")
     if capabilities.gptEnabled:
-        issues, gpt_note = _enhance_issues_with_gpt(issues)
-        capabilities.notes.append(gpt_note)
+        issues, ai_note = _enhance_issues_with_ai(issues, capabilities)
+        capabilities.notes.append(ai_note)
     audit_id = uuid4().hex
     audit = AuditResult(
         id=audit_id,
