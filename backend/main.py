@@ -569,47 +569,52 @@ def _report_for_audit(audit: AuditResult) -> str:
     return "\n".join(lines)
 
 
-@app.post("/api/audits", response_model=AuditResult)
+@app.post("/api/audits")
 async def create_audit(design_image: UploadFile = File(...), developed_image: UploadFile = File(...)):
     import traceback
 
-    design_content = await _read_image(design_image)
-    developed_content = await _read_image(developed_image)
-    design = _decode_image(design_content)
-    developed = _decode_image(developed_content)
+    try:
+        design_content = await _read_image(design_image)
+        developed_content = await _read_image(developed_image)
+        design = _decode_image(design_content)
+        developed = _decode_image(developed_content)
 
-    _, issues, preprocessing = _detect_visual_issues(design, developed)
-    capabilities = _capabilities()
-    if capabilities.ocrEnabled:
-        try:
-            text_issues, ocr_note = _detect_text_issues(design, developed, len(issues) + 1)
-            issues.extend(text_issues)
-            capabilities.notes.append(ocr_note)
-        except Exception as exc:
-            capabilities.ocrEnabled = False
-            capabilities.notes.append(f"OCR 执行失败，已跳过文字差异检测：{exc}")
-            capabilities.notes.append(traceback.format_exc()[-300:])
-    if capabilities.gptEnabled:
-        try:
-            issues, ai_note = _enhance_issues_with_ai(issues, capabilities)
-            capabilities.notes.append(ai_note)
-        except Exception as exc:
-            capabilities.notes.append(f"AI 增强失败：{exc}")
-    audit_id = uuid4().hex
-    audit = AuditResult(
-        id=audit_id,
-        createdAt=datetime.now().isoformat(timespec="seconds"),
-        designImage=_image_info(design_image, design),
-        developedImage=_image_info(developed_image, developed),
-        preprocessing=preprocessing,
-        capabilities=capabilities,
-        score=_score_for_issues(issues),
-        issues=issues,
-    )
-    AUDITS[audit_id] = audit
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / f"{audit_id}.png").write_bytes(_annotate_image(developed, issues))
-    return audit
+        _, issues, preprocessing = _detect_visual_issues(design, developed)
+        capabilities = _capabilities()
+        if capabilities.ocrEnabled:
+            try:
+                text_issues, ocr_note = _detect_text_issues(design, developed, len(issues) + 1)
+                issues.extend(text_issues)
+                capabilities.notes.append(ocr_note)
+            except Exception as exc:
+                capabilities.ocrEnabled = False
+                capabilities.notes.append(f"OCR 执行失败，已跳过文字差异检测：{exc}")
+                capabilities.notes.append(traceback.format_exc()[-300:])
+        if capabilities.gptEnabled:
+            try:
+                issues, ai_note = _enhance_issues_with_ai(issues, capabilities)
+                capabilities.notes.append(ai_note)
+            except Exception as exc:
+                capabilities.notes.append(f"AI 增强失败：{exc}")
+        audit_id = uuid4().hex
+        audit = AuditResult(
+            id=audit_id,
+            createdAt=datetime.now().isoformat(timespec="seconds"),
+            designImage=_image_info(design_image, design),
+            developedImage=_image_info(developed_image, developed),
+            preprocessing=preprocessing,
+            capabilities=capabilities,
+            score=_score_for_issues(issues),
+            issues=issues,
+        )
+        AUDITS[audit_id] = audit
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        (DATA_DIR / f"{audit_id}.png").write_bytes(_annotate_image(developed, issues))
+        return audit
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/api/audits/{audit_id}/annotated-image")
