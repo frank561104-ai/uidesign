@@ -30,6 +30,14 @@ def _cors_origins() -> List[str]:
     return origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
+def _cors_origin_regex() -> str:
+    configured = os.getenv("UIDESIGN_CORS_REGEX", "")
+    if configured:
+        return configured
+    # Always allow same-origin render.com subdomain requests (frontend served from same backend)
+    return r"https://.*\.onrender\.com"
+
+
 class BBox(BaseModel):
     x: int
     y: int
@@ -93,6 +101,7 @@ app = FastAPI(title="uidesign API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_origin_regex=_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
