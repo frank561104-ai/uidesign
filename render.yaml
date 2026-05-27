@@ -8,7 +8,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: UIDESIGN_CORS_ORIGINS
-        value: https://your-frontend-domain.vercel.app
+        value: https://uidesign-delta.vercel.app,https://uidesign-frank561104-7610s-projects.vercel.app
       - key: UIDESIGN_ENABLE_OCR
         value: "false"
       - key: UIDESIGN_ENABLE_GPT
