@@ -1,6 +1,6 @@
 fastapi==0.115.6
 httpx==0.28.1
-numpy==2.0.2
+numpy>=2.3.2
 openai==2.11.0
 opencv-python-headless==4.10.0.84
 pillow==11.1.0
