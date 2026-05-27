@@ -71,7 +71,7 @@ select {
 }
 
 .upload-grid {
-  grid-template-columns: repeat(2, 600px);
+  grid-template-columns: repeat(2, minmax(280px, 600px));
   justify-content: center;
   align-items: start;
 }
@@ -110,10 +110,10 @@ select {
 .drop-zone {
   display: grid;
   place-items: center;
-  width: 568px;
+  width: 100%;
   max-width: 100%;
-  min-height: 640px;
-  height: 640px;
+  min-height: 320px;
+  height: clamp(320px, 50vh, 640px);
   margin-top: 14px;
   overflow: hidden;
   border: 1px dashed #b9c5d4;
@@ -124,8 +124,8 @@ select {
 
 .drop-zone.has-preview {
   position: relative;
-  min-height: 640px;
-  height: 640px;
+  min-height: 320px;
+  height: clamp(320px, 50vh, 640px);
   padding: 12px;
   overflow: hidden;
   background: #ffffff;
@@ -512,7 +512,7 @@ select {
   }
 
   .workspace {
-    width: min(100vw - 20px, 680px);
+    width: calc(100vw - 20px);
     padding-top: 10px;
   }
 
@@ -522,15 +522,23 @@ select {
   }
 
   .score-number {
-    font-size: 48px;
+    font-size: 36px;
   }
 
-  .drop-zone,
-  .drop-zone.has-preview,
-  .drop-zone:not(.has-preview) {
+  .toolbar {
     width: 100%;
-    min-height: 520px;
-    height: 58vh;
+  }
+
+  .toolbar-primary {
+    flex: 1;
+  }
+
+  .image-panel {
+    min-height: 280px;
+  }
+
+  .issue-list {
+    max-height: 480px;
   }
 }
 
